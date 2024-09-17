@@ -1,6 +1,3 @@
-# slcaping-bot
-bot trading sclaping
-
 //+------------------------------------------------------------------+
 //|                                                      TIME EA.mq5 |
 //|                                  Copyright 2024, MetaQuotes Ltd. |
@@ -9,41 +6,61 @@ bot trading sclaping
 #property copyright "Copyright 2024, MetaQuotes Ltd."
 #property link      "https://www.mql5.com"
 #property version   "1.02"
+
 #include <Trade/Trade.mqh>
+#include <ChartObjects\ChartObjectsTxtControls.mqh>
 //+------------------------------------------------------------------+
 //| Inputs                                                           |
 //+------------------------------------------------------------------+
 input group "==== Entradas Generales ===="
-input int InpMagicNumber = 123456; // Magic Number para identificar las órdenes del EA
-input double InpPercent = 3;       // Porcentaje de riesgo en relación al balance de la cuenta
-input int MaxSpread = 2;           // Límite máximo de spread en puntos
-input int InpTp = 200;             // Puntos de Take Profit
-input int InpSl = 200;             // Puntos de Stop Loss
-input ENUM_TIMEFRAMES TimeFrame = PERIOD_CURRENT;//Marco de tiempo a utilizar
+input int InpMagicNumber = 123456;                    // Magic Number para identificar las órdenes del EA
+input double InpPercent = 3;                          // Porcentaje de riesgo en relación al balance de la cuenta
+input int MaxSpread = 2;                              // Límite máximo de spread en puntos
+input int InpTp = 200;                                // Puntos de Take Profit
+input int InpSl = 200;                                // Puntos de Stop Loss
+input ENUM_TIMEFRAMES TimeFrame = PERIOD_CURRENT;     // Marco de tiempo a utilizar
 input group "==== Trailing Stop ===="
-input bool EnableTrailingStop = true; // Activar/Desactivar el Trailing Stop
-input int InpTrailingStop = 15;       // Puntos del Trailing Stop inicial
-input int TslPoints = 10;             // Puntos del Trailing Stop por debajo/encima del precio
+input bool EnableTrailingStop = true;                 // Activar/Desactivar el Trailing Stop
+input int InpTrailingStop = 15;                       // Puntos del Trailing Stop inicial
+input int TslPoints = 10;                             // Puntos del Trailing Stop por debajo/encima del precio
 input group "==== Cierre de Operaciones ===="
-input bool InpCloseAtEnd = false; // Cerrar todas las posiciones a final de tiempo
-input group "==== Analisis de barras ===="
-input int ExpirationsBars = 100; // Número de barras para expiración de órdenes
-input int OrderDiskPoints = 100; // Puntos de separación para órdenes
-input int InpBarsToAnalyze = 200; // Cantidad de velas a analizar
+input bool InpCloseAtEnd = false;                     // Cerrar todas las posiciones a final de tiempo
 input group "==== Periodo de Tiempo ===="
-input int SHInput = 0; // Hora de Inicio de operación (0-23)
-input int EHInput = 0; // Hora de Fin de operación (0-23)
+input int InpBarsToAnalyze = 200;                     // Cantidad de velas a analizar
+input int ExpirationsBars = 100;                      // Número de barras para expiración de órdenes
+input int OrderDiskPoints = 100;                      // Puntos de separación para órdenes
+input int SHInput = 0;                                // Hora de Inicio de operación (0-23)
+input int EHInput = 0;                                // Hora de Fin de operación (0-23)
+input group "==== Personalización ===="
+input string TradeComment = "Comentario del EA";      // Comentario en las órdenes del EA
 
 // Variables generales
 CTrade trade; // Objeto para operaciones de trading
 CPositionInfo pos; // Objeto para información de posiciones
 COrderInfo ord; // Objeto para información de órdenes
 int BarsN = 5; // Número de barras para análisis
+// Variable global para almacenar el balance inicial
+double balance_inicial;
+
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
 //+------------------------------------------------------------------+
 int OnInit()
 {
+   // Obtener el balance inicial de la cuenta
+   balance_inicial = AccountInfoDouble(ACCOUNT_BALANCE);
+   
+   // Crear el panel inicial
+   CrearPanel();
+
+   /*// Verificación para detectar si el gráfico está en tiempo real
+    if (MQLInfoInteger(MQL_TESTER) == false)
+    {
+        // Si no está en modo prueba, detener el bot y mostrar un mensaje
+        Print("Este bot solo se puede utilizar en el modo de prueba. Deteniendo el EA.");
+        return(INIT_FAILED); // Finaliza la ejecución del EA
+    }*/
+    
    trade.SetExpertMagicNumber(InpMagicNumber); // Configura el Magic Number para las operaciones
    ChartSetInteger(0, CHART_SHOW_GRID, false); // Desactiva la visualización de la cuadrícula en el gráfico
 
@@ -55,16 +72,17 @@ int OnInit()
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
 {
-
+   // No se realiza ninguna acción al desinicializar el EA
 }
+
 //+------------------------------------------------------------------+
 //| Expert tick function                                             |
 //+------------------------------------------------------------------+
 void OnTick()
 {
+     ActualizarPanelBalance();
    // Llama a la función para gestionar el trailing stop
    TrailinStop();
-    
    // Verifica si hay una nueva barra en el gráfico
    if (!IsNewBar()) return;
 
@@ -326,4 +344,73 @@ void TrailinStop()
             }
         }
     }
+}
+
+// Función para crear el panel
+void CrearPanel()
+{
+   // Verificamos si ya existe el objeto, si no lo creamos
+   if (ObjectFind(0, "PanelBalance") == -1)
+   {
+      // Crear un objeto rectángulo como fondo del panel
+      ObjectCreate(0, "PanelBalance", OBJ_RECTANGLE_LABEL, 0, 0, 0);
+      ObjectSetInteger(0, "PanelBalance", OBJPROP_CORNER, CORNER_LEFT_UPPER); // Esquina superior izquierda
+      ObjectSetInteger(0, "PanelBalance", OBJPROP_XDISTANCE, 10); // Distancia del borde izquierdo
+      ObjectSetInteger(0, "PanelBalance", OBJPROP_YDISTANCE, 10); // Distancia del borde superior
+      ObjectSetInteger(0, "PanelBalance", OBJPROP_COLOR, clrDarkGray); // Color del fondo
+      ObjectSetInteger(0, "PanelBalance", OBJPROP_STYLE, STYLE_SOLID); // Estilo sólido
+      ObjectSetInteger(0, "PanelBalance", OBJPROP_SELECTABLE, false); // No seleccionable
+      ObjectSetInteger(0, "PanelBalance", OBJPROP_HIDDEN, true); // Escondido en la lista de objetos
+      ObjectSetInteger(0, "PanelBalance", OBJPROP_BACK, true); // En el fondo
+
+      // Ajustar el ancho del panel
+      ObjectSetInteger(0, "PanelBalance", OBJPROP_WIDTH, 150);  
+      ObjectSetDouble(0, "PanelBalance", OBJPROP_SCALE, 1.0); // Escala para ajuste del tamaño
+   }
+
+   // Verificamos si ya existe el texto del balance, si no lo creamos
+   if (ObjectFind(0, "TextoBalance") == -1)
+   {
+      ObjectCreate(0, "TextoBalance", OBJ_LABEL, 0, 0, 0);
+      ObjectSetInteger(0, "TextoBalance", OBJPROP_CORNER, CORNER_LEFT_UPPER); // Esquina superior izquierda
+      ObjectSetInteger(0, "TextoBalance", OBJPROP_XDISTANCE, 15); // Distancia del borde izquierdo
+      ObjectSetInteger(0, "TextoBalance", OBJPROP_YDISTANCE, 20); // Distancia del borde superior (dentro del panel)
+      ObjectSetInteger(0, "TextoBalance", OBJPROP_FONTSIZE, 14); // Tamaño de la fuente
+      ObjectSetInteger(0, "TextoBalance", OBJPROP_BACK, true); // En el fondo
+   }
+}
+
+// Función para actualizar el panel con las ganancias o pérdidas acumuladas
+void ActualizarPanelBalance()
+{
+   // Obtener el equity actual de la cuenta
+   double equity = AccountInfoDouble(ACCOUNT_EQUITY);
+   
+   // Calcular la ganancia o pérdida acumulada
+   double ganancia_perdida = equity - balance_inicial;
+   
+   // Definir el texto que se mostrará
+   string textoBalance;
+   
+   // Si hay ganancia, mostrar en verde con el valor positivo
+   if (ganancia_perdida > 0)
+   {
+      textoBalance = StringFormat("Ender lo mama bien: %.2f USD", ganancia_perdida);
+      ObjectSetInteger(0, "TextoBalance", OBJPROP_COLOR, clrGreen); // Color verde para ganancia
+   }
+   // Si hay pérdida, mostrar en rojo con el valor negativo
+   else if (ganancia_perdida < 0)
+   {
+      textoBalance = StringFormat("Ender lo mama mal: %.2f USD", MathAbs(ganancia_perdida)); // MathAbs para mostrar el valor absoluto
+      ObjectSetInteger(0, "TextoBalance", OBJPROP_COLOR, clrRed); // Color rojo para pérdida
+   }
+   // Si no hay ni ganancia ni pérdida, mostrar en blanco
+   else
+   {
+      textoBalance = "Sin cambios";
+      ObjectSetInteger(0, "TextoBalance", OBJPROP_COLOR, clrWhite); // Color blanco para sin cambios
+   }
+
+   // Actualizar el texto con la ganancia o pérdida acumulada
+   ObjectSetString(0, "TextoBalance", OBJPROP_TEXT, textoBalance);
 }
